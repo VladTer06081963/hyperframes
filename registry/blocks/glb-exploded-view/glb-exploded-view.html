@@ -411,6 +411,38 @@
         renderer.render(scene, camera);
         placeLabels();
       };
+      /* HyperFrames contract: the host dispatches `hf-seek` with the target
+         time and renders the composition itself. We must draw from that time
+         instead of relying on the GSAP ticker, which is throttled or frozen
+         in headless capture and therefore produces identical frames. */
+      window.addEventListener("hf-seek", function (event) {
+        var detail = (event && event.detail) || {};
+        var time = typeof detail.time === "number" ? detail.time : 0;
+        if (host.render) host.render(time);
+        if (typeof detail.waitUntil === "function") {
+          detail.waitUntil(Promise.resolve());
+        }
+      });
+      /* Debug/inspection handle: lets tools read the collected parts, the
+         computed explode plan and the live scene without reaching into
+         three.js internals. */
+      host.debug = {
+        parts: parts,
+        plan: plan,
+        scene: scene,
+        camera: camera,
+        renderer: renderer,
+        applyExplode: applyExplode,
+        partPositions: function () {
+          const out = {};
+          parts.forEach(function (p) {
+            const v = new THREE.Vector3();
+            p.node.getWorldPosition(v);
+            out[p.name] = [v.x, v.y, v.z];
+          });
+          return out;
+        }
+      };
       host.render(0);
 
       await renderer.compileAsync(scene, camera);
